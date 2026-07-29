@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>My Mini App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+        }
+        #app-frame {
+            border: none;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        #blocked-message {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #f5f5f5;
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            padding: 20px;
+            text-align: center;
+        }
+        #blocked-message h1 {
+            color: #e74c3c;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        #blocked-message p {
+            color: #555;
+            font-size: 16px;
+            max-width: 400px;
+            line-height: 1.6;
+        }
+        #blocked-message .telegram-icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+        #blocked-message .button {
+            display: inline-block;
+            background-color: #0088cc;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 8px;
+            text-decoration: none;
+            margin-top: 20px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <!-- Blocked Message for non-Telegram access -->
+    <div id="blocked-message">
+        <div class="telegram-icon">📱</div>
+        <h1>⚠️ Access Restricted</h1>
+        <p>This application is designed to run exclusively inside the Telegram app.</p>
+        <p style="font-size: 14px; color: #888; margin-top: 10px;">Please open this link from your Telegram app.</p>
+        <a href="https://t.me/YOUR_BOT_USERNAME" class="button">Open in Telegram</a>
+    </div>
+
+    <!-- The actual app frame -->
+    <iframe id="app-frame" src="menu.html"></iframe>
+
+    <script>
+        // ============================================
+        // TELEGRAM-ONLY ENFORCEMENT - Multiple Layers
+        // ============================================
+
+        (function() {
+            'use strict';
+
+            // LAYER 1: Check for Telegram WebApp object
+            function isTelegramWebApp() {
+                try {
+                    return typeof window.Telegram !== 'undefined' && 
+                           window.Telegram.WebApp && 
+                           window.Telegram.WebApp.initData !== '';
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            // LAYER 2: Check for Telegram-specific user agent
+            function isTelegramUserAgent() {
+                const ua = navigator.userAgent || '';
+                return ua.includes('Telegram') || ua.includes('Android') && ua.includes('FBAN');
+            }
+
+            // LAYER 3: Check URL parameters (Telegram passes specific params)
+            function hasTelegramParams() {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.has('tgWebAppData') || 
+                       urlParams.has('tgWebAppVersion') ||
+                       urlParams.has('tgWebAppPlatform');
+            }
+
+            // LAYER 4: Check if it's opened from a deep link
+            function isTelegramDeepLink() {
+                return document.referrer.includes('t.me') || 
+                       document.referrer.includes('telegram');
+            }
+
+            // LAYER 5: Prevent iframe busting (if someone tries to embed)
+            function preventIframeBusting() {
+                if (window.top !== window.self) {
+                    window.top.location = window.self.location;
+                }
+            }
+
+            // Main validation
+            function validateTelegramContext() {
+                const isTelegram = isTelegramWebApp() || 
+                                  isTelegramUserAgent() || 
+                                  hasTelegramParams() || 
+                                  isTelegramDeepLink();
+
+                const blockedDiv = document.getElementById('blocked-message');
+                const appFrame = document.getElementById('app-frame');
+
+                if (!isTelegram) {
+                    // Hide the app, show blocked message
+                    appFrame.style.display = 'none';
+                    blockedDiv.style.display = 'flex';
+                    return false;
+                }
+
+                // It's Telegram - proceed
+                appFrame.style.display = 'block';
+                blockedDiv.style.display = 'none';
+                return true;
+            }
+
+            // Initialize Telegram WebApp
+            function initTelegramApp() {
+                try {
+                    if (typeof window.Telegram !== 'undefined' && window.Telegram.WebApp) {
+                        const WebApp = window.Telegram.WebApp;
+                        
+                        // Ready the app
+                        WebApp.ready();
+                        
+                        // Expand to full height
+                        WebApp.expand();
+                        
+                        // Enable closing button
+                        WebApp.enableClosingConfirmation();
+                        
+                        // Apply theme to iframe
+                        const iframe = document.getElementById('app-frame');
+                        iframe.addEventListener('load', function() {
+                            // Send init data to iframe
+                            try {
+                                iframe.contentWindow.postMessage({
+                                    type: 'initData',
+                                    data: WebApp.initData,
+                                    theme: WebApp.themeParams,
+                                    colorScheme: WebApp.colorScheme
+                                }, '*');
+                            } catch (e) {
+                                // Ignore cross-origin errors
+                            }
+                        });
+
+                        // Send heartbeat to ensure app stays active
+                        setInterval(() => {
+                            try {
+                                WebApp.expand();
+                            } catch (e) {}
+                        }, 5000);
+
+                    }
+                } catch (e) {
+                    console.error('Telegram init error:', e);
+                }
+            }
+
+            // PREVENT RIGHT-CLICK (to discourage "Open in Chrome")
+            document.addEventListener('contextmenu', function(e) {
+                if (!isTelegramWebApp()) {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+
+            // PREVENT keyboard shortcuts for opening dev tools
+            document.addEventListener('keydown', function(e) {
+                // F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
+                if (e.key === 'F12' || 
+                    (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) ||
+                    (e.ctrlKey && e.key === 'U')) {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+
+            // Run validation on load
+            document.addEventListener('DOMContentLoaded', function() {
+                const isValid = validateTelegramContext();
+                if (isValid) {
+                    initTelegramApp();
+                }
+            });
+
+            // Double-check after a second (for dynamic loading)
+            setTimeout(function() {
+                if (!isTelegramWebApp() && !isTelegramUserAgent()) {
+                    const blockedDiv = document.getElementById('blocked-message');
+                    const appFrame = document.getElementById('app-frame');
+                    if (blockedDiv.style.display !== 'flex') {
+                        appFrame.style.display = 'none';
+                        blockedDiv.style.display = 'flex';
+                    }
+                }
+            }, 1000);
+
+            // Prevent the page from being loaded in an iframe (clickjacking protection)
+            if (window.top !== window.self) {
+                window.top.location = window.self.location;
+            }
+
+            // Override any attempts to open links in new windows
+            window.open = function(url, name, specs) {
+                if (!isTelegramWebApp()) {
+                    return null;
+                }
+                // If in Telegram, allow but ensure it's handled properly
+                if (url.startsWith('https://t.me/')) {
+                    return window.open(url, name, specs);
+                }
+                return null;
+            };
+
+        })();
+    </script>
+</body>
+</html>
