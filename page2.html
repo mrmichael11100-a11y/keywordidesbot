@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page 2</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: system-ui, sans-serif; 
+            margin: 20px; 
+            background-color: var(--tg-theme-bg-color, #fff); 
+            color: var(--tg-theme-text-color, #000); 
+            min-height: 100vh;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { margin-bottom: 16px; }
+        p { margin-bottom: 16px; color: var(--tg-theme-hint-color, #666); }
+        button { 
+            background-color: var(--tg-theme-button-color, #40a7e3); 
+            color: var(--tg-theme-button-text-color, #fff); 
+            border: none; 
+            padding: 12px; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            cursor: pointer; 
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        button:hover { opacity: 0.85; }
+        .back { 
+            background-color: var(--tg-theme-secondary-bg-color, #eee); 
+            color: var(--tg-theme-text-color, #000); 
+        }
+        .security-badge {
+            font-size: 12px;
+            color: #27ae60;
+            text-align: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📄 Page 2</h1>
+        <p>This is the second page of your Telegram Mini App.</p>
+        <button onclick="navigateTo('menu.html')" class="back">← Back to Menu</button>
+        <button onclick="closeApp()">❌ Close App</button>
+        <div class="security-badge">🔒 Secured • Telegram Only</div>
+    </div>
+
+    <script>
+        function navigateTo(page) {
+            try {
+                const mainFrame = window.parent.document.getElementById('app-frame');
+                if (mainFrame) {
+                    mainFrame.src = page;
+                } else {
+                    window.location.href = page;
+                }
+            } catch (e) {
+                window.location.href = page;
+            }
+        }
+
+        function closeApp() {
+            try {
+                const WebApp = window.parent.Telegram.WebApp;
+                if (WebApp) WebApp.close();
+                else window.close();
+            } catch (e) {
+                window.close();
+            }
+        }
+
+        function applyTheme() {
+            try {
+                const WebApp = window.parent.Telegram.WebApp;
+                if (WebApp && WebApp.themeParams) {
+                    const theme = WebApp.themeParams;
+                    const root = document.documentElement;
+                    Object.keys(theme).forEach(key => {
+                        root.style.setProperty(`--tg-theme-${key}`, theme[key]);
+                    });
+                }
+            } catch (e) {}
+        }
+
+        applyTheme();
+        document.addEventListener('contextmenu', e => e.preventDefault());
+    </script>
+</body>
+</html>
